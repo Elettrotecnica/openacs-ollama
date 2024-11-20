@@ -9,14 +9,15 @@
     <implements-subsite-p>f</implements-subsite-p>
     <inherit-templates-p>f</inherit-templates-p>
 
-    <version name="0.2d" url="http://openacs.org/repository/download/apm/ollama-0.2d.apm">
+    <version name="0.3d" url="http://openacs.org/repository/download/apm/ollama-0.3d.apm">
         <owner url="mailto:antonio@elettrotecnica.it">Antonio Pisano</owner>
         <summary>Ollama LLM Tool integration</summary>
+        <release-date>2024-11-21</release-date>
         <vendor url="https://www.elettrotecnica.it">L&#39;Elettrotecnica S.r.l.</vendor>
         <description format="text/html">This package provides an integration to the Ollama LLM tool (https://github.com/ollama/ollama).</description>
         <maturity>0</maturity>
 
-        <provides url="ollama" version="0.2d"/>
+        <provides url="ollama" version="0.3d"/>
 
         <callbacks>
             <callback type="after-install"  proc="ollama::install::package_install"/>
@@ -26,6 +27,8 @@
         <parameters>
             <parameter scope="instance" datatype="number"  min_n_values="1"  max_n_values="1"  name="embedding_batch_size"  default="50" description="Number of documents to be sent simultaneously to the Ollama backend to generate embeddings." section_name="Indexing"/>
             <parameter scope="instance" datatype="string"  min_n_values="1"  max_n_values="1"  name="embedding_model"  default="all-minilm" description="Model used to generate embeddings. See https://ollama.com/search?c=embedding for possible values." section_name="Indexing"/>
+            <parameter scope="instance" datatype="number"  min_n_values="1"  max_n_values="1"  name="indexing_chunk_overlap"  default="100" description="By how many words will chunk overlap when indexing content." section_name="Indexing"/>
+            <parameter scope="instance" datatype="number"  min_n_values="1"  max_n_values="1"  name="indexing_chunk_size"  default="1000" description="Number of words for each chunk when splitting the content for indexing." section_name="Indexing"/>
             <parameter scope="instance" datatype="string"  min_n_values="1"  max_n_values="1"  name="ollama_host"  default="http://localhost:11434" description="Ollama host instance." section_name="General"/>
             <parameter scope="instance" datatype="number"  min_n_values="1"  max_n_values="1"  name="similarity_threshold"  default="0.9" description="Minimal similarity threshold used to decide if a document is relevant. This value expresses a cosine similarity in the 0 (highest) to 2 (smallest) range." section_name="Search"/>
         </parameters>

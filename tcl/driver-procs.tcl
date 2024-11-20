@@ -18,19 +18,36 @@ ad_proc -public ollama::index {
     # We do not actually index here, because we want to batch the
     # embeddings.
     #
-    # We may decide to split the content in multiple rows at some
-    # point. Here is where this should happen.
-    #
-    set content [join [list $title $keywords $txt]]
-    db_dml index {
-        with cleanup as (
-                         delete from ollama_ts_index
-                          where object_id = :object_id
-                         )
-        insert into ollama_ts_index
-        (object_id, content)
-        values
-        (:object_id, :content)
+    set package_id [apm_package_id_from_key ollama]
+
+    set chunk_size [parameter::get \
+                        -package_id $package_id \
+                        -parameter indexing_chunk_size \
+                        -default 1000]
+
+    set chunk_overlap [parameter::get \
+                           -package_id $package_id \
+                           -parameter indexing_chunk_overlap \
+                           -default 100]
+
+    db_transaction {
+        db_dml clear_entries {
+            delete from ollama_ts_index
+            where object_id = :object_id
+        }
+        set content [join [list $title $keywords $txt]]
+        set content [regexp -all -inline {\S+} $content]
+        while {[llength $content] > 0} {
+            set chunk [lrange $content 0 $chunk_size]
+            set start [expr {max($chunk_size - $chunk_overlap, 1)}]
+            set content [lrange $content $start end]
+            db_dml index {
+                insert into ollama_ts_index
+                (object_id, content)
+                values
+                (:object_id, :chunk)
+            }
+        }
     }
 }
 
@@ -76,7 +93,7 @@ ad_proc -private ollama::batch_index {} {
                     -host $host
 
                 set response [indexer embed -input $input]
-                ns_log warning $response
+                # ns_log warning $response
 
                 package require json
                 set embeddings [dict get \
@@ -201,14 +218,18 @@ ad_proc -callback search::search -impl ollama-driver {
     # https://github.com/pgvector/pgvector?tab=readme-ov-file#can-i-store-vectors-with-different-dimensions-in-the-same-column
     #
     set results_ids [db_list search [subst -nocommands {
-        select distinct(orig_object_id) from acs_permission.permission_p_recursive_array(array(
-           select index.object_id
-           from $from_clauses
-           where o.object_id = index.object_id
-             and index.embedding::vector($embedding_size) <=> :embedding <= :similarity_threshold
-             $where_clauses
-           order by index.embedding::vector($embedding_size) <=> :embedding asc
-        ), :user_id, 'read')
+        select orig_object_id, max(i.embedding::vector($embedding_size) <=> :embedding)
+          from acs_permission.permission_p_recursive_array(array(
+                 select index.object_id
+                 from $from_clauses
+                 where o.object_id = index.object_id
+                   and index.embedding::vector($embedding_size) <=> :embedding <= :similarity_threshold
+                   $where_clauses
+                 ), :user_id, 'read') o,
+              ollama_ts_index i
+        where o.orig_object_id = i.object_id
+        group by orig_object_id
+        order by 2
         fetch first :limit rows only
         offset :offset
     }]]
@@ -241,8 +262,30 @@ ad_proc -public ollama::summary {
 
     @return summary containing search query terms
 } {
-    regsub -nocase -all -- "((^|\\s)([join $query |])($|\\s))" $txt {<b>\1</b>} txt
-    return $txt
+    set length [string length $txt]
+
+    set max_length 35
+    set max_occurrences 0
+    set best_chunk ""
+    set rgxp "((^|\\s)([join $query |])($|\\s))"
+    while {[string length $txt] > 0} {
+        set chunk [string range $txt 0 $max_length]
+        set txt [string range $txt $max_length end]
+        set occurrences [regsub -nocase -all -- $rgxp $chunk {<b>\1</b>} chunk]
+        #
+        # Stop as soon as the number of occurrences decreases to
+        # improve performance.
+        #
+        if {$occurrences < $max_occurrences} {
+            break
+        }
+        if {$occurrences > $max_occurrences} {
+            set max_occurrences $occurrences
+            set best_chunk $chunk
+        }
+    }
+
+    return $best_chunk
 }
 
 ad_proc -callback search::driver_info -impl ollama-driver {
