@@ -278,13 +278,15 @@ ad_proc -public ollama::summary {
 
     set txt [regexp -all -inline {\S+} $txt]
     while {[llength $txt] > 0} {
-        set chunk [join [lrange $txt 0 $max_words]]
+        set chunk [lrange $txt 0 $max_words]
         set txt [lrange $txt $max_words end]
 
         set occurrences 0
+        set match_chunk [lsort -unique [lmap word $chunk {
+            string tolower $word
+        }]]
         foreach word $query_words {
-            incr occurrences \
-                [expr {[string first $word $chunk] >= 0}]
+            incr occurrences [expr {$word in $match_chunk}]
         }
         if {$occurrences > $max_occurrences} {
             set max_occurrences $occurrences
@@ -296,8 +298,8 @@ ad_proc -public ollama::summary {
     }
 
     regsub -nocase -all -- \
-        "((\[^a-zA-Z0-9\]?)([join $query_words |])(\[^a-zA-Z0-9\]?))" \
-        $best_chunk {\2<b>\3</b>\4} best_chunk
+        "((^|\[^a-zA-Z0-9\])(([join $query_words |])( ([join $query_words |]))*)($|\[^a-zA-Z0-9\]))" \
+        [join $best_chunk] {\2<b>\3</b>\7} best_chunk
 
     return $best_chunk
 }
