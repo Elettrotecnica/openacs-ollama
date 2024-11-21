@@ -6,6 +6,40 @@ ad_library {
 
 namespace eval ollama {}
 
+ad_proc -private ollama::bootstrap_index {} {
+    Can be useful when moving to this driver on a system that was
+    using a different driver before. Re-schedules indexing on the
+    whole set of searchable objects.
+} {
+    set searchable_types [list]
+    db_foreach get_object_types {
+        select object_type from acs_object_types
+    } {
+        if {[search::searchable_type_p -object_type $object_type]} {
+            lappend searchable_types $object_type
+        }
+    }
+
+    ns_log notice \
+        ollama::bootstrap_index \
+        "[llength $searchable_types] object types:" \
+        $searchable_types
+
+    if {[llength $searchable_types] == 0} {
+        return
+    }
+
+    db_foreach get_indexable_objects [subst {
+        select object_id from acs_objects
+        where object_type in ([ns_dbquotelist $searchable_types])
+    }] {
+        ns_log notice \
+            ollama::bootstrap_index \
+            indexing $object_id
+        search::object_index -object_id $object_id
+    }
+}
+
 ad_proc -public ollama::index {
     object_id
     txt
@@ -102,12 +136,18 @@ ad_proc -private ollama::batch_index {} {
                                         ] embeddings]
 
                 foreach index_id $indexes embedding $embeddings {
-                    set embedding \[[join $embedding ,]\]
-
-                    db_dml store_embedding {
-                        update ollama_ts_index set
-                        embedding = :embedding
-                        where index_id = :index_id
+                    if {$embedding eq ""} {
+                        db_dml delete_not_indexable {
+                            delete from ollama_ts_index
+                            where index_id = :index_id
+                        }
+                    } else {
+                        set embedding \[[join $embedding ,]\]
+                        db_dml store_embedding {
+                            update ollama_ts_index set
+                            embedding = :embedding
+                            where index_id = :index_id
+                        }
                     }
                 }
             } else {
