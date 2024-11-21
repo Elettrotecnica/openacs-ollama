@@ -95,10 +95,6 @@ ad_proc -private ollama::batch_index {} {
                        -package_id $package_id \
                        -parameter embedding_model]
 
-        set host [parameter::get \
-                      -package_id $package_id \
-                      -parameter ollama_host]
-
         set batch_size [parameter::get \
                             -package_id $package_id \
                             -parameter embedding_batch_size \
@@ -123,8 +119,7 @@ ad_proc -private ollama::batch_index {} {
 
             if {[llength $indexes] > 0} {
                 ::ollama::API create indexer \
-                    -model $model \
-                    -host $host
+                    -model $model
 
                 set response [indexer embed -input $input]
                 # ns_log warning $response
@@ -374,13 +369,8 @@ ad_proc -private ollama::build_query {
                    -package_id $package_id \
                    -parameter embedding_model]
 
-    set host [parameter::get \
-                  -package_id $package_id \
-                  -parameter ollama_host]
-
     ::ollama::API create indexer \
-        -model $model \
-        -host $host
+        -model $model
 
     set response [indexer embed -input [list $query]]
 

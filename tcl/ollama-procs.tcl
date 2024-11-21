@@ -8,9 +8,18 @@ namespace eval ollama {
 
     nx::Class create API {
 
-        :property {host:required}
+        :property {host}
         :property {model:required}
         :property {timeout 60}
+
+        :method init {} {
+            if {![info exists :host]} {
+                set package_id [apm_package_id_from_key ollama]
+                set :host [parameter::get \
+                               -package_id $package_id \
+                               -parameter ollama_host]
+            }
+        }
 
         :method to_json {
             {vars {}}
