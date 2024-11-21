@@ -9,10 +9,14 @@ create table ollama_ts_index (
    embedding vector
 );
 
+CREATE INDEX ollama_ts_index_object_id_idx ON
+       ollama_ts_index(object_id);
+
 --
 -- This index has the same embedding dimensions as the popular
 -- https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
 --
-CREATE INDEX ollama_ts_index_384 ON ollama_ts_index USING hnsw ((embedding::vector(384)) vector_cosine_ops);
+CREATE INDEX ollama_ts_index_embedding_384_idx ON
+       ollama_ts_index USING hnsw ((embedding::vector(384)) vector_cosine_ops);
 
 end;
