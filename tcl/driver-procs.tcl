@@ -260,30 +260,44 @@ ad_proc -public ollama::summary {
 } {
     Highlights matching terms.
 
+    Behaves similar to Postgres ts_headline
+
+    @see https://www.postgresql.org/docs/current/textsearch-controls.html#TEXTSEARCH-HEADLINE
+
     @return summary containing search query terms
 } {
-    set length [string length $txt]
+    set query_words [lsort -unique \
+                         [regexp -all -inline {\S+} \
+                              [string tolower $query]]]
 
-    set max_length 35
+    set n_query_words [llength $query_words]
+
+    set max_words 35
     set max_occurrences 0
     set best_chunk ""
-    set rgxp "((^|\\s)([join $query |])($|\\s))"
-    while {[string length $txt] > 0} {
-        set chunk [string range $txt 0 $max_length]
-        set txt [string range $txt $max_length end]
-        set occurrences [regsub -nocase -all -- $rgxp $chunk {<b>\1</b>} chunk]
-        #
-        # Stop as soon as the number of occurrences decreases to
-        # improve performance.
-        #
-        if {$occurrences < $max_occurrences} {
-            break
+
+    set txt [regexp -all -inline {\S+} $txt]
+    while {[llength $txt] > 0} {
+        set chunk [join [lrange $txt 0 $max_words]]
+        set txt [lrange $txt $max_words end]
+
+        set occurrences 0
+        foreach word $query_words {
+            incr occurrences \
+                [expr {[string first $word $chunk] >= 0}]
         }
         if {$occurrences > $max_occurrences} {
             set max_occurrences $occurrences
             set best_chunk $chunk
         }
+        if {$occurrences == $n_query_words} {
+            break
+        }
     }
+
+    regsub -nocase -all -- \
+        "((\[^a-zA-Z0-9\]?)([join $query_words |])(\[^a-zA-Z0-9\]?))" \
+        $best_chunk {\2<b>\3</b>\4} best_chunk
 
     return $best_chunk
 }
