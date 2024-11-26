@@ -10,7 +10,7 @@ namespace eval ollama {
 
         :property {host}
         :property {model:required}
-        :property {timeout 60}
+        :property {timeout 3600}
 
         :method init {} {
             if {![info exists :host]} {
