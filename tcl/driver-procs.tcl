@@ -191,8 +191,6 @@ ad_proc -callback search::search -impl ollama-driver {
     set embedding_size [llength $embedding]
     set embedding \[[join $embedding ,]\]
 
-    ns_log warning $embedding
-
     set where_clauses ""
     set from_clauses ""
 
@@ -255,7 +253,7 @@ ad_proc -callback search::search -impl ollama-driver {
     set results_ids [db_list search [subst -nocommands {
         select orig_object_id, max(i.embedding::vector($embedding_size) <=> :embedding)
           from acs_permission.permission_p_recursive_array(array(
-                 select index.object_id
+                 select distinct index.object_id
                  from $from_clauses
                  where o.object_id = index.object_id
                    and index.embedding::vector($embedding_size) <=> :embedding <= :similarity_threshold
