@@ -103,6 +103,12 @@ ad_proc -public ollama::rag::context {
     }] \n\n]
     set context [subst -nocommands $template]
 
+    #
+    # It seems, we need this in order for ollama to accept our
+    # message.
+    #
+    set context [encoding convertto $context]
+
     return [list \
                 context $context \
                 references $references]
