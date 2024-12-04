@@ -72,15 +72,43 @@ namespace eval ollama {
             -url:required
             {-body ""}
             {-files ""}
+            {-handler ""}
         } {
             #
             # Shorthand for POST requests
             #
-            return [::util::http::post \
-                        -timeout ${:timeout} \
-                        -body $body \
-                        -files $files \
-                        -url ${:host}${url}]
+
+            set payload [::util::http::post_payload -files $files -body $body]
+            set body [dict get $payload payload]
+            set body_file [dict get $payload payload_file]
+            set headers [ns_set array [dict get $payload headers]]
+
+            package require http
+            package require tls
+            ::http::register https 443 ::tls::socket
+
+            set cmd [list \
+                         ::http::geturl ${:host}$url \
+                         -headers $headers]
+            if {$body_file ne ""} {
+                set body_channel [open $body_file r]
+                lappend cmd -querychannel $body_channel
+            } else {
+                lappend cmd -query $body
+            }
+            if {$handler ne ""} {
+                lappend cmd -handler $handler
+            }
+
+            try {
+                set response [array get [{*}$cmd]]
+            } finally {
+                if {[info exists body_channel]} {
+                    close $body_channel
+                }
+            }
+
+            return $response
         }
 
         :method images_to_base64 {
@@ -107,7 +135,7 @@ namespace eval ollama {
                                  -system
                                  -template
                                  -context
-                                 {-stream false}
+                                 {-handler ""}
                                  -raw
                                  -keep_alive
                              } {
@@ -132,6 +160,8 @@ namespace eval ollama {
 
             set model ${:model}
 
+            set stream [expr {$handler ne ""}]
+
             set body [:to_json {
                 model
                 prompt
@@ -149,6 +179,7 @@ namespace eval ollama {
 
             return [:post \
                         -body $body \
+                        -handler $handler \
                         -url /api/generate]
         }
 
@@ -171,7 +202,7 @@ namespace eval ollama {
                              -tools
                              -format
                              -options
-                             {-stream false}
+                             {-handler ""}
                              -keep_alive
                          } {
             #
@@ -211,6 +242,8 @@ namespace eval ollama {
 
             set model ${:model}
 
+            set stream [expr {$handler ne ""}]
+
             set body [:to_json {
                 model
                 messages:array
@@ -223,6 +256,7 @@ namespace eval ollama {
 
             return [:post \
                         -body $body \
+                        -handler $handler \
                         -url /api/chat]
 
         }
@@ -230,7 +264,7 @@ namespace eval ollama {
         :public method create {
                                -model
                                -modelfile
-                               {-stream false}
+                               {-handler ""}
                                -path
                                -quantize
                            } {
@@ -245,6 +279,9 @@ namespace eval ollama {
             #
             # @return endpoint response as dict
             #
+
+            set stream [expr {$handler ne ""}]
+
             set body [:to_json {
                 model
                 modelfile
@@ -255,6 +292,7 @@ namespace eval ollama {
 
             return [:post \
                         -body $body \
+                        -handler $handler \
                         -url /api/create]
         }
 
@@ -362,7 +400,7 @@ namespace eval ollama {
         :public method pull {
                              -model:required
                              -insecure
-                             {-stream false}
+                             {-handler ""}
                          } {
             #
             # Pull a Model
@@ -371,6 +409,9 @@ namespace eval ollama {
             #
             # @return endpoint response as dict
             #
+
+            set stream [expr {$handler ne ""}]
+
             set body [:to_json {
                 model
                 insecure:boolean
@@ -379,13 +420,14 @@ namespace eval ollama {
 
             return [:post \
                         -body $body \
+                        -handler $handler \
                         -url /api/pull]
         }
 
         :public method push {
                              -model:required
                              -insecure
-                             {-stream false}
+                             {-handler ""}
                          } {
             #
             # Push a Model (requires account)
@@ -394,6 +436,9 @@ namespace eval ollama {
             #
             # @return endpoint response as dict
             #
+
+            set stream [expr {$handler ne ""}]
+
             set body [:to_json {
                 model
                 insecure:boolean
@@ -402,6 +447,7 @@ namespace eval ollama {
 
             return [:post \
                         -body $body \
+                        -handler $handler \
                         -url /api/push]
         }
 

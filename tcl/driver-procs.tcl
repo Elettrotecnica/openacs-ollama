@@ -127,7 +127,7 @@ ad_proc -private ollama::batch_index {} {
                 package require json
                 set embeddings [dict get \
                                     [::json::json2dict \
-                                         [dict get $response page]\
+                                         [dict get $response body] \
                                         ] embeddings]
 
                 foreach index_id $indexes embedding $embeddings {
@@ -377,7 +377,7 @@ ad_proc -private ollama::build_query {
     try {
         set embeddings [dict get \
                             [::json::json2dict \
-                                 [dict get $response page]\
+                                 [dict get $response body] \
                                 ] embeddings]
     } on error {errmsg} {
         ns_log error \
