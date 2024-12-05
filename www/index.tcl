@@ -6,6 +6,11 @@ ad_page_contract {
     {message ""}
 }
 
+::template::head::add_css \
+    -href /resources/acs-templating/modal.css
+::template::head::add_javascript \
+    -src /resources/acs-templating/modal.js
+
 if {$message ne ""} {
     #
     # Enhance the query with the context coming from our documents.
@@ -17,6 +22,7 @@ if {$message ne ""} {
     #
     ::template::util::list_to_multirow references \
         [dict get $rag references]
+
     set rag_message [dict get $rag context]
 
     #

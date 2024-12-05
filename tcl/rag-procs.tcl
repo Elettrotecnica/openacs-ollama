@@ -45,7 +45,8 @@ ad_proc -public ollama::rag::references {
 
     set references [list]
     db_foreach get_context [subst -nocommands {
-        select i.object_id,
+        select i.index_id,
+               i.object_id,
                i.content,
                i.embedding::vector($embedding_size) <=> :embedding as similarity
         from (select distinct orig_object_id
@@ -63,6 +64,7 @@ ad_proc -public ollama::rag::references {
         set title [dict get [search::object_datasource -object_id $object_id] title]
         set url [search::object_url -object_id $object_id]
         lappend references [list \
+                                index_id $index_id \
                                 object_id $object_id \
                                 content $content \
                                 similarity $similarity \
