@@ -6,25 +6,6 @@ ad_library {
 
 namespace eval ollama {
 
-    nsf::proc background_reply_handler {} {
-        #
-        # This handler simply writes the content from the request back
-        # to us as-is via connection channel.
-        #
-        # Note that one should not try to access the connection
-        # channel anymore after using this proc.
-        #
-        # @see https://www.tcl.tk/man/tcl8.6/TclCmd/http.htm#M23
-        #
-        # @return a handler proc suitable for the http tcl command.
-        #
-        ns_write "HTTP/1.0 200 OK\r\nContent-type: text/plain\r\n\r\n"
-
-        return [list ::apply {{channel socket token} {
-            ns_connchan write -buffered $channel [read $socket]
-        }} [ns_connchan detach]]
-    }
-
     nx::Class create API {
 
         :property {host}

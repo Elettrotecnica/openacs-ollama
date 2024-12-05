@@ -11,16 +11,27 @@ ad_page_contract {
 # to the background.
 #
 
-set handler [::ollama::background_reply_handler]
+ns_write "HTTP/1.0 200 OK\r\nContent-type: text/plain\r\n\r\n"
 
-ad_schedule_proc -thread t -once t 0 ::apply {{message handler} {
-    ::ollama::API create chatter -model llama3.2
+set channel [ns_connchan detach]
 
-    chatter chat \
-        -handler $handler \
-        -messages [list \
-                       [list \
-                            role "user" \
-                            content $message \
-                           ]]
-}} $message $handler
+ad_schedule_proc -thread t -once t 0 ::apply {
+    {
+        message
+        channel
+    } {
+        ::ollama::API create chatter -model llama3.2
+
+        set handler [list ::apply {{channel socket token} {
+            ns_connchan write -buffered $channel [read $socket]
+        }} $channel]
+
+        chatter chat \
+            -handler $handler \
+            -messages [list \
+                           [list \
+                                role "user" \
+                                content $message \
+                               ]]
+    }
+} $message $channel
