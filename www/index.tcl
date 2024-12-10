@@ -59,6 +59,9 @@ if {$message ne ""} {
                     const r = JSON.parse(value);
                     reply.textContent+= r.message.content;
                 }
+            } catch (e) {
+                console.error(e);
+                alert(e.message);
             } finally {
                 for (const field of fields) {
                     field.disabled = false;
