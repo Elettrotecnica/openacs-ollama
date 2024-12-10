@@ -9,16 +9,25 @@ namespace eval ollama {
     nx::Class create API {
 
         :property {host}
-        :property {model:required}
+        :property {model ""}
         :property {timeout 3600}
 
         :method init {} {
+            set :package_id [apm_package_id_from_key ollama]
             if {![info exists :host]} {
-                set package_id [apm_package_id_from_key ollama]
                 set :host [parameter::get \
-                               -package_id $package_id \
+                               -package_id ${:package_id} \
                                -parameter ollama_host]
             }
+        }
+
+        :public method model {} {
+            if {${:model} eq ""} {
+                set :model [::parameter::get \
+                                -package_id ${:package_id} \
+                                -parameter default_generation_model]
+            }
+            return ${:model}
         }
 
         :method to_json {
@@ -158,7 +167,7 @@ namespace eval ollama {
                 set images [:images_to_base64 $images]
             }
 
-            set model ${:model}
+            set model [:model]
 
             set stream [expr {$handler ne ""}]
 
@@ -240,7 +249,7 @@ namespace eval ollama {
                 }]
             }
 
-            set model ${:model}
+            set model [:model]
 
             set stream [expr {$handler ne ""}]
 
@@ -334,6 +343,18 @@ namespace eval ollama {
             # @return endpoint response as dict
             #
             return [util::http::get -url ${:host}/api/tags]
+        }
+
+        :public method models {} {
+            #
+            # List installed models. This is a shorthand of the tags
+            # method returning the pre-digested list from the API
+            # response.
+            #
+            # @return list of model information
+            #
+            package require json
+            return [dict get [::json::json2dict [dict get [:tags] page]] models]
         }
 
         :public method show {
@@ -464,7 +485,7 @@ namespace eval ollama {
             #
             # @return endpoint response as dict
             #
-            set model ${:model}
+            set model [:model]
 
             set body [:to_json {
                 model

@@ -31,21 +31,38 @@ if {$message ne ""} {
     #
     ::template::add_body_handler -event load -script {
         async function readData() {
-            const formData = new FormData();
-            const message = document.querySelector('#rag-message').textContent;
-            formData.append('message', message);
-            const url = 'rag-response';
-            const response = await fetch(url, {
-                method: 'POST',
-                body: formData,
-            });
-            const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+            const form = document.querySelector('#chat');
+            const fields = form.querySelectorAll('input,textarea,button,select');
+            for (const field of fields) {
+                field.disabled = true;
+            }
+            try {
+                const formData = new FormData();
 
-            while (true) {
-                const {value, done} = await reader.read();
-                if (done) break;
-                const r = JSON.parse(value);
-                reply.textContent+= r.message.content;
+                const message = document.querySelector('#rag-message').textContent;
+                formData.append('message', message);
+
+                const model = document.querySelector('#chat [name=model]').value;
+                formData.append('model', model);
+
+                const url = 'rag-response';
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+                while (true) {
+                    const {value, done} = await reader.read();
+                    if (done) break;
+                    const r = JSON.parse(value);
+                    reply.textContent+= r.message.content;
+                }
+            } finally {
+                for (const field of fields) {
+                    field.disabled = false;
+                }
             }
         }
 
@@ -53,9 +70,28 @@ if {$message ne ""} {
     }
 }
 
+set models [list]
+::ollama::API create ollama
+
+set selected_model [ollama model]
+
+foreach option [ollama models] {
+    set option [dict get $option name]
+    if {[lindex [split $option :] 0] eq $selected_model} {
+        set selected_model $option
+    }
+    lappend models \
+        [list $option $option]
+}
+
 ad_form -name chat -form {
     {message:text(textarea)
         {label {Message}}
+    }
+    {model:text(select)
+        {label {Model}}
+        {options $models}
+        {value $selected_model}
     }
 } -on_request {
 

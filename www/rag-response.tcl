@@ -4,6 +4,7 @@ ad_page_contract {
 
 } {
     message:allhtml,notnull
+    model:notnull
 }
 
 #
@@ -18,9 +19,10 @@ set channel [ns_connchan detach]
 ad_schedule_proc -thread t -once t 0 ::apply {
     {
         message
+        model
         channel
     } {
-        ::ollama::API create chatter -model llama3.2
+        ::ollama::API create chatter -model $model
 
         set handler [list ::apply {{channel socket token} {
             ns_connchan write -buffered $channel [read $socket]
@@ -34,4 +36,4 @@ ad_schedule_proc -thread t -once t 0 ::apply {
                                 content $message \
                                ]]
     }
-} $message $channel
+} $message $model $channel

@@ -9,16 +9,16 @@
     <implements-subsite-p>f</implements-subsite-p>
     <inherit-templates-p>f</inherit-templates-p>
 
-    <version name="0.5d" url="http://openacs.org/repository/download/apm/ollama-0.5d.apm">
+    <version name="0.6d" url="http://openacs.org/repository/download/apm/ollama-0.6d.apm">
         <owner url="mailto:antonio@elettrotecnica.it">Antonio Pisano</owner>
         <summary>Ollama LLM Tool integration</summary>
-        <release-date>2024-11-21</release-date>
+        <release-date>2024-12-10</release-date>
         <vendor url="https://www.elettrotecnica.it">L&#39;Elettrotecnica S.r.l.</vendor>
         <description format="text/html">This package provides an integration to the Ollama LLM tool (https://github.com/ollama/ollama).</description>
         <maturity>0</maturity>
 
-        <provides url="ollama" version="0.5d"/>
-        <requires url="search" version="6.0.0d2"/>
+        <provides url="ollama" version="0.6d"/>
+        <requires url="search" version="6.0.0d1"/>
 
         <callbacks>
             <callback type="after-install"  proc="ollama::install::package_install"/>
@@ -26,6 +26,7 @@
             <callback type="before-uninstall"  proc="ollama::install::before_uninstall"/>
         </callbacks>
         <parameters>
+            <parameter scope="instance" datatype="string"  min_n_values="1"  max_n_values="1"  name="default_generation_model"  description="Default model for text generation." section_name="General"/>
             <parameter scope="instance" datatype="number"  min_n_values="1"  max_n_values="1"  name="embedding_batch_size"  default="50" description="Number of documents to be sent simultaneously to the Ollama backend to generate embeddings." section_name="Indexing"/>
             <parameter scope="instance" datatype="string"  min_n_values="1"  max_n_values="1"  name="embedding_model"  default="all-minilm" description="Model used to generate embeddings. See https://ollama.com/search?c=embedding for possible values." section_name="Indexing"/>
             <parameter scope="instance" datatype="number"  min_n_values="1"  max_n_values="1"  name="indexing_chunk_overlap"  default="100" description="By how many words will chunk overlap when indexing content." section_name="Indexing"/>
