@@ -58,6 +58,10 @@ if {$message ne ""} {
                     if (done) break;
                     const r = JSON.parse(value);
                     reply.textContent+= r.message.content;
+                    if (r.done) {
+                        reader.cancel();
+                        break;
+                    }
                 }
             } catch (e) {
                 console.error(e);
