@@ -71,6 +71,7 @@ ad_proc -public ollama::index {
         }
         set content [join [list $title $keywords $txt]]
         set content [regexp -all -inline {\S+} $content]
+        set count 0
         while {[llength $content] > 0} {
             set chunk [lrange $content 0 $chunk_size]
             set start [expr {max($chunk_size - $chunk_overlap, 1)}]
@@ -81,8 +82,12 @@ ad_proc -public ollama::index {
                 values
                 (:object_id, :chunk)
             }
+            incr count
         }
     }
+
+    ns_log notice \
+        "ollama::index $object_id split into $count chunks"
 }
 
 ad_proc -private ollama::batch_index {} {
@@ -136,6 +141,9 @@ ad_proc -private ollama::batch_index {} {
                             delete from ollama_ts_index
                             where index_id = :index_id
                         }
+                        ns_log notice \
+                            ollama::batch_index \
+                            no embedding for index_id=$index_id
                     } else {
                         set embedding \[[join $embedding ,]\]
                         db_dml store_embedding {
@@ -143,6 +151,9 @@ ad_proc -private ollama::batch_index {} {
                             embedding = :embedding
                             where index_id = :index_id
                         }
+                        ns_log notice \
+                            ollama::batch_index \
+                            stored embedding for index_id=$index_id
                     }
                 }
             } else {
