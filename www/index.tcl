@@ -4,6 +4,50 @@ ad_page_contract {
 
 } {
     {message ""}
+    {conversation_id:naturalnum ""}
+    model:optional
+}
+
+set user_id [ad_conn user_id]
+set package_id [ad_conn package_id]
+set peeraddr [ad_conn peeraddr]
+
+if {$conversation_id eq ""} {
+    ::permission::require_permission \
+        -party_id $user_id \
+        -object_id $package_id \
+        -privilege write
+
+    #
+    # Start of a new conversation. Title is empty at first.
+    #
+    db_1row start_conversation {
+        with start as (
+                       insert into ollama_conversations
+                       (
+                        conversation_id
+                        ) values (
+                                  (select acs_object__new(
+                                                         null,
+                                                         'ollama_conversation',
+                                                         current_timestamp,
+                                                         :user_id,
+                                                         :peeraddr,
+                                                         :package_id,
+                                                         't',
+                                                         null,
+                                                         :package_id
+                                                         ))
+                                  )
+                       returning *
+                       )
+        select conversation_id from start;
+    }
+} else {
+    ::permission::require_permission \
+        -party_id $user_id \
+        -object_id $conversation_id \
+        -privilege write
 }
 
 ::template::head::add_css \
@@ -17,13 +61,18 @@ if {$message ne ""} {
     #
     set rag [ollama::rag::context -query $message]
 
-    #
-    # Display the document context to the users.
-    #
-    ::template::util::list_to_multirow references \
-        [dict get $rag references]
+    db_dml save_message {
+        insert into ollama_conversation_messages
+        (conversation_id, content, rag, role, model)
+        values
+        (:conversation_id, :message, :rag, 'user', :model)
+    }
 
-    set rag_message [dict get $rag context]
+    if {[llength [dict get $rag references]] > 0} {
+        set rag_message [dict get $rag context]
+    } else {
+        set rag_message $message
+    }
 
     #
     # Connect to the streaming backend to receive the reply from the
@@ -45,24 +94,33 @@ if {$message ne ""} {
                 const model = document.querySelector('#chat [name=model]').value;
                 formData.append('model', model);
 
+                const conversationId = document.querySelector('#chat [name=conversation_id]').value;
+                formData.append('conversation_id', conversationId);
+
                 const url = 'rag-response';
                 const response = await fetch(url, {
                     method: 'POST',
                     body: formData,
                 });
 
+                const reply = document.querySelector('#reply');
+
                 const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
                 while (true) {
                     const {value, done} = await reader.read();
-                    if (done) break;
+                    if (done) {
+                        break;
+                    }
                     const r = JSON.parse(value);
-                    reply.textContent+= r.message.content;
+                    reply.textContent += r.message.content;
                     if (r.done) {
-                        reader.cancel();
                         break;
                     }
                 }
+
+                reader.cancel();
+
             } catch (e) {
                 console.error(e);
                 alert(e.message);
@@ -76,6 +134,44 @@ if {$message ne ""} {
         readData();
     }
 }
+
+db_multirow messages get_messages {
+    select message_id, timestamp, role, content, rag
+    from ollama_conversation_messages
+    where conversation_id = :conversation_id
+    order by timestamp asc
+} {
+    if {[dict exists $rag references] && [llength [dict get $rag references]] > 0} {
+        unset -nocomplain refs
+        set rag <h2>References:</h2><ul>[join [lmap ref [dict get $rag references] {
+            set count [incr refs([dict get $ref object_id])]
+            set count [expr {$count == 1 ? "" : " - $count"}]
+            subst {
+             <li>
+              <div id="modal-[dict get $ref index_id]" class="acs-modal">
+               <div class="acs-modal-content">
+                <h3>[ns_quotehtml [dict get $ref title]]$count</h3>
+                <p>[ns_quotehtml [dict get $ref content]]</p>
+                <p><a
+                      href="[ns_quotehtml [dict get $ref url]]"
+                      target="_blank">#acs-subsite.See_full_size#</a></p>
+                <p>Similarity: [dict get $ref similarity]</p>
+                <button class="acs-modal-close">Close</button>
+               </div>
+              </div>
+              <a
+                 class="acs-modal-open"
+                 data-target="#modal-[dict get $ref index_id]"
+                 href="#">[ns_quotehtml [dict get $ref title]]$count
+              </a>
+             </li>
+            }
+        }]]</ul>
+    } else {
+        set rag ""
+    }
+}
+
 
 set models [list]
 ::ollama::API create ollama
@@ -91,18 +187,21 @@ foreach option [ollama models] {
         [list $option $option]
 }
 
-ad_form -name chat -form {
-    {message:text(textarea)
-        {label {Message}}
-    }
-    {model:text(select)
-        {label {Model}}
-        {options $models}
-        {value $selected_model}
-    }
-} -on_request {
+ad_form \
+    -name chat \
+    -export {conversation_id} \
+    -form {
+        {message:text(textarea)
+            {label {Message}}
+        }
+        {model:text(select)
+            {label {Model}}
+            {options $models}
+            {value $selected_model}
+        }
+    } -on_request {
 
-} -on_submit {
-}
+    } -on_submit {
+    }
 
 

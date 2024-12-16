@@ -1,31 +1,14 @@
 <master>
 
-  <if @message@ not nil>
-    <h1>Your question:</h1>
-    <p>@message@</p>
-    <h1>Context information:</h1>
-    <ul>
-      <multiple name="references">
-        <li>
-          <div id="modal-@references.index_id@" class="acs-modal">
-            <div class="acs-modal-content">
-              <h3>@references.title@</h3>
-              <p>@references.content@</p>
-              <p><a href="@references.url@" target="_blank">#acs-subsite.See_full_size#</a></p>
-              <p>Similarity: @references.similarity@</p>
-              <button class="acs-modal-close">Close</button>
-            </div>
-          </div>
-          <a
-            class="acs-modal-open"
-            data-target="#modal-@references.index_id@"
-            href="#">@references.title@
-          </a>
-        </li>
-      </multiple>
-    </ul>
-    <h1>Reply:</h1>
-    <p id="reply"></p>
+  <multiple name="messages">
+    <h1><if @messages.role@ eq "user">You</if><else>LLM</else>:</h1>
+    <p>@messages.content@</p>
+    @messages.rag;noquote@
+  </multiple>
+  <if @message@ ne "">
+    <h1>LLM:</h1>
     <div id="rag-message" style="display:none;">@rag_message@</div>
+    <p id="reply"></p>
   </if>
+  <h1>You:</h1>
   <formtemplate id="chat"></formtemplate>
