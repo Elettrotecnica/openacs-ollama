@@ -55,6 +55,16 @@ if {$conversation_id eq ""} {
 ::template::head::add_javascript \
     -src /resources/acs-templating/modal.js
 
+::template::head::add_javascript \
+    -src https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js
+
+::template::add_body_handler -event load -script {
+    const converter = new showdown.Converter();
+    for (const message of document.querySelectorAll('.markdown')) {
+       message.innerHTML = converter.makeHtml(message.textContent);
+    }
+}
+
 if {$message ne ""} {
     #
     # Enhance the query with the context coming from our documents.
@@ -104,8 +114,11 @@ if {$message ne ""} {
                 });
 
                 const reply = document.querySelector('#reply');
+                reply.dataset.text = '';
 
                 const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+                const converter = new showdown.Converter();
 
                 while (true) {
                     const {value, done} = await reader.read();
@@ -113,7 +126,8 @@ if {$message ne ""} {
                         break;
                     }
                     const r = JSON.parse(value);
-                    reply.textContent += r.message.content;
+                    reply.dataset.text += r.message.content;
+                    reply.innerHTML = converter.makeHtml(reply.dataset.text);
                     if (r.done) {
                         break;
                     }

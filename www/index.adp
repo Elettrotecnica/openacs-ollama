@@ -2,7 +2,7 @@
 
   <multiple name="messages">
     <h1><if @messages.role@ eq "user">You</if><else>LLM</else>:</h1>
-    <p>@messages.content@</p>
+    <p class="markdown">@messages.content@</p>
     @messages.rag;noquote@
     <hr>
   </multiple>
