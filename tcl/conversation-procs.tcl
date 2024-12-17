@@ -37,3 +37,67 @@ ad_proc -private ollama::conversation::save_reply {
         where message_id = :message_id
     }
 }
+
+ad_proc -private ollama::conversation::generate_title {
+    -conversation_id:required
+} {
+    Produce a title from the contents of this conversation and save
+    it.
+} {
+    if {[db_0or1row get_first_message {
+        select content, model
+        from ollama_conversation_messages
+        where conversation_id = :conversation_id
+        order by timestamp asc
+        fetch first 1 rows only
+    }]} {
+        ns_log notice \
+            ollama::conversation::generate_title \
+            $conversation_id \
+            "Generating..."
+
+        ::ollama::API create titler -model $model
+
+        set message [string trim [subst -nocommands {
+            Generate a suitable title for the message enclosed within
+            <message></message> XML tags. Generate the title and
+            nothing else. Ensure the title is in the same language as
+            the message.
+
+            <message>$content</content>
+        }]]
+
+        set response [titler chat \
+                          -messages [list \
+                                         [list role user content $message]]]
+
+        ns_log notice \
+            ollama::conversation::generate_title \
+            $conversation_id \
+            "Response received" \
+            $response
+
+        package require json
+        set title [dict get [dict get \
+                                 [::json::json2dict \
+                                      [dict get $response body] \
+                                     ] message] content]
+
+        ns_log notice \
+            ollama::conversation::generate_title \
+            $conversation_id \
+            "Title extracted" \
+            $title
+
+        db_dml save_title {
+            update acs_objects set
+            title = :title
+            where object_id = :conversation_id
+        }
+
+        ns_log notice \
+            ollama::conversation::generate_title \
+            $conversation_id \
+            "Title saved"
+    }
+}
