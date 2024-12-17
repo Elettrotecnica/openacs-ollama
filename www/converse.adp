@@ -12,7 +12,7 @@
     <h1>LLM:</h1>
     <div id="rag-message" style="display:none;">@rag_message@</div>
     <p id="reply"></p>
-  </if>
   <hr>
+  </if>
   <h1>You:</h1>
   <formtemplate id="chat"></formtemplate>
