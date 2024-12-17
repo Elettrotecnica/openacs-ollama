@@ -6,10 +6,8 @@ ad_library {
 
 namespace eval ollama {}
 
-ad_proc -private ollama::bootstrap_index {} {
-    Can be useful when moving to this driver on a system that was
-    using a different driver before. Re-schedules indexing on the
-    whole set of searchable objects.
+ad_proc -private ollama::searchable_types {} {
+    @return the searchable object types.
 } {
     set searchable_types [list]
     db_foreach get_object_types {
@@ -21,10 +19,122 @@ ad_proc -private ollama::bootstrap_index {} {
     }
 
     ns_log notice \
-        ollama::bootstrap_index \
+        ollama::searchable_types \
         "[llength $searchable_types] object types:" \
         $searchable_types
 
+    return $searchable_types
+}
+
+ad_proc -private ollama::instance_relevant_packages {
+    -package_id:required
+} {
+    @param package_id an ollama instance id
+
+    @return a list of package ids supposed to contain searchable
+            content that are relevant to this ollama instance.
+} {
+    #
+    # For now the definition of "relevant" is "descendant of the
+    # package instance"
+    #
+    set node_id [::site_node::get_node_id_from_object_id -object_id $package_id]
+    return [::site_node::get_children \
+                -all \
+                -element object_id \
+                -node_id $node_id]
+}
+
+ad_proc -private ollama::index_instance_descendants {} {
+    Index all searchable objects that belong to packages mounted
+    underneath an ollama package instance.  This is meant to be
+    scheduled and to happen regardless of the full-text-search driver
+    in use on the system.
+} {
+    set packages_to_index [list]
+    foreach package_id [::apm_package_ids_from_key -package_key ollama -mounted] {
+        lappend packages_to_index \
+            {*}[::ollama::instance_relevant_packages -package_id $package_id]
+    }
+
+    ns_log notice \
+        ollama::index_instance_descendants \
+        "Indexing [llength $packages_to_index] packages"
+
+    if {[llength $packages_to_index] == 0} {
+        return
+    }
+
+    ::ollama::package_index -package_ids $packages_to_index
+}
+
+ad_proc -private ollama::package_index {
+    -package_ids:required
+    -force_reindex:boolean
+} {
+    Performs only the ollama indexing on selected packages.
+
+    This works also if the system is not configured to use the ollama
+    driver as full-text-search driver.
+} {
+    db_foreach get_indexable_objects [subst {
+        select object_id, object_type
+        from acs_objects o
+        where object_type in ([ns_dbquotelist [ollama::searchable_types]])
+        and package_id in ([ns_dbquotelist $package_ids])
+        and (:force_reindex_p or
+             not exists (select 1 from ollama_ts_index
+                         where object_id = o.object_id)
+             )
+    }] {
+        set d(object_id) $object_id
+
+        array set d {
+            title {}
+            mime {}
+            storage_type {}
+            keywords {}
+            package_id {}
+            relevant_date {}
+        }
+
+        if {[callback::impl_exists -callback search::datasource -impl $object_type]} {
+            array set d [lindex [callback \
+                                     -impl $object_type \
+                                     search::datasource \
+                                     -object_id $object_id] 0]
+        } else {
+            array set d [acs_sc::invoke \
+                             -contract FtsContentProvider \
+                             -operation datasource \
+                             -call_args [list $object_id] \
+                             -impl $object_type]
+        }
+
+        if {[array size d] == 0} {
+            return
+        }
+
+        ::search::content_get txt \
+            $d(content) \
+            $d(mime) \
+            $d(storage_type) \
+            $object_id
+
+        ::ollama::index \
+            $object_id \
+            $txt \
+            $d(title) \
+            $d(keywords)
+    }
+}
+
+ad_proc -private ollama::bootstrap_index {} {
+    Can be useful when moving to this driver on a system that was
+    using a different driver before. Re-schedules indexing on the
+    whole set of searchable objects.
+} {
+    set searchable_types [ollama::searchable_types]
     if {[llength $searchable_types] == 0} {
         return
     }
@@ -52,15 +162,13 @@ ad_proc -public ollama::index {
     # We do not actually index here, because we want to batch the
     # embeddings.
     #
-    set package_id [apm_package_id_from_key ollama]
-
-    set chunk_size [parameter::get \
-                        -package_id $package_id \
+    set chunk_size [::parameter::get_global_value \
+                        -package_key ollama \
                         -parameter indexing_chunk_size \
                         -default 1000]
 
-    set chunk_overlap [parameter::get \
-                           -package_id $package_id \
+    set chunk_overlap [::parameter::get_global_value \
+                           -package_key ollama \
                            -parameter indexing_chunk_overlap \
                            -default 100]
 
@@ -94,14 +202,12 @@ ad_proc -private ollama::batch_index {} {
     Batch index entries without embeddings.
 } {
     if {[nsv_incr ollama batch_embeddings_p] == 1} {
-        set package_id [apm_package_id_from_key ollama]
-
-        set model [parameter::get \
-                       -package_id $package_id \
+        set model [::parameter::get_global_value \
+                       -package_key ollama \
                        -parameter embedding_model]
 
-        set batch_size [parameter::get \
-                            -package_id $package_id \
+        set batch_size [::parameter::get_global_value \
+                            -package_key ollama \
                             -parameter embedding_batch_size \
                             -default 50]
 
@@ -192,9 +298,8 @@ ad_proc -callback search::search -impl ollama-driver {
 } {
     FtsEngineDriver search operation implementation for ollama.
 } {
-    set package_id [apm_package_id_from_key ollama]
-    set similarity_threshold [parameter::get \
-                                  -package_id $package_id \
+    set similarity_threshold [::parameter::get_global_value \
+                                  -package_key ollama \
                                   -parameter similarity_threshold \
                                   -default 0.9]
 
@@ -373,9 +478,8 @@ ad_proc -private ollama::build_query {
     @param query string to convert
     @return returns formatted query string for ollama tsquery
 } {
-    set package_id [apm_package_id_from_key ollama]
-    set model [parameter::get \
-                   -package_id $package_id \
+    set model [::parameter::get_global_value \
+                   -package_key ollama \
                    -parameter embedding_model]
 
     ::ollama::API create indexer \

@@ -69,7 +69,10 @@ if {$message ne ""} {
     #
     # Enhance the query with the context coming from our documents.
     #
-    set rag [ollama::rag::context -query $message]
+    set rag [::ollama::rag::context \
+                 -user_id $user_id \
+                 -package_id $package_id \
+                 -query $message]
 
     set n_messages [db_string save_message {
         with insert as (
@@ -129,16 +132,23 @@ if {$message ne ""} {
 
                 const converter = new showdown.Converter();
 
+                let text = '';
                 while (true) {
                     const {value, done} = await reader.read();
                     if (done) {
                         break;
                     }
-                    const r = JSON.parse(value);
-                    reply.dataset.text += r.message.content;
-                    reply.innerHTML = converter.makeHtml(reply.dataset.text);
-                    if (r.done) {
-                        break;
+                    text += value.substring(0, value.indexOf('\n'));
+                    try {
+                        const r = JSON.parse(text);
+                        text = '';
+                        reply.textContent+= r.message.content;
+                        if (r.done) {
+                            break;
+                        }
+                    } catch (e) {
+                        text += value.substring(value.indexOf('\n'));
+                        console.log('PARTIAL READ');
                     }
                 }
 

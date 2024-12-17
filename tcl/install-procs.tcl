@@ -30,13 +30,6 @@ ad_proc -private ollama::install::package_install {} {
     Installation callback for ollama search engine driver
 } {
     ollama::install::register_fts_impl
-
-    if {[::search::driver_name] eq ""} {
-        parameter::set_value \
-            -package_id [apm_package_id_from_key search] \
-            -parameter FtsEngineDriver \
-            -value ollama-driver
-    }
 }
 
 ad_proc -private ollama::install::register_fts_impl {} {

@@ -13,18 +13,17 @@ namespace eval ollama {
         :property {timeout 3600}
 
         :method init {} {
-            set :package_id [apm_package_id_from_key ollama]
             if {![info exists :host]} {
-                set :host [parameter::get \
-                               -package_id ${:package_id} \
+                set :host [::parameter::get_global_value \
+                               -package_key ollama \
                                -parameter ollama_host]
             }
         }
 
         :public method model {} {
             if {${:model} eq ""} {
-                set :model [::parameter::get \
-                                -package_id ${:package_id} \
+                set :model [::parameter::get_global_value \
+                                -package_key ollama \
                                 -parameter default_generation_model]
             }
             return ${:model}
