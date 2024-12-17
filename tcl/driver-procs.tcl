@@ -87,45 +87,22 @@ ad_proc -private ollama::package_index {
                          where object_id = o.object_id)
              )
     }] {
-        set d(object_id) $object_id
-
-        array set d {
-            title {}
-            mime {}
-            storage_type {}
-            keywords {}
-            package_id {}
-            relevant_date {}
-        }
-
-        if {[callback::impl_exists -callback search::datasource -impl $object_type]} {
-            array set d [lindex [callback \
-                                     -impl $object_type \
-                                     search::datasource \
-                                     -object_id $object_id] 0]
-        } else {
-            array set d [acs_sc::invoke \
-                             -contract FtsContentProvider \
-                             -operation datasource \
-                             -call_args [list $object_id] \
-                             -impl $object_type]
-        }
-
-        if {[array size d] == 0} {
-            return
+        set d [::search::object_datasource -object_id $object_id]
+        if {[llength $d] == 0} {
+            continue
         }
 
         ::search::content_get txt \
-            $d(content) \
-            $d(mime) \
-            $d(storage_type) \
-            $object_id
+            [dict get $d content] \
+            [dict get $d mime] \
+            [dict get $d storage_type] \
+            [dict get $d object_id]
 
         ::ollama::index \
             $object_id \
             $txt \
-            $d(title) \
-            $d(keywords)
+            [dict get $d title] \
+            [dict get $d keywords]
     }
 }
 
