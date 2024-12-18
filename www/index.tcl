@@ -12,16 +12,16 @@ set user_id [ad_conn user_id]
 set package_id [ad_conn package_id]
 set peeraddr [ad_conn peeraddr]
 
+::permission::require_permission \
+    -party_id $user_id \
+    -object_id $package_id \
+    -privilege read
+
 set knowledge_packages [list]
 foreach knowledge_package_id [::ollama::instance_relevant_packages -package_id $package_id] {
     lappend knowledge_packages [::site_node::get_from_object_id -object_id $knowledge_package_id]
 }
 ::template::util::list_to_multirow knowledge $knowledge_packages
-
-::permission::require_permission \
-    -party_id $user_id \
-    -object_id $package_id \
-    -privilege read
 
 set actions [list \
                  "New conversation" converse "Start a new conversation" \
