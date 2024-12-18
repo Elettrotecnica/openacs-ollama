@@ -7,6 +7,7 @@ This package provides integration with [Ollama](https://ollama.com/) in OpenACS.
 * Complete wrapper for the [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md), including streaming response.
 * Implements the FtsEngineDriver contract. You can use semantic embedding-based indexing to search into your documents.
 * RAG implementation. Use the indexed data from your packages (file-storage, xowiki, forums...) to inquire the model.
+* RAG from web search. Optionally, one can use the query as a web search to provide additional context to the model.
 
 ## Dependencies
 
@@ -41,5 +42,4 @@ As many models will output markdown when replying to the user, we have also inte
 
 * images in RAG conversations
 * support for index bootsrap/reindexing in the UI
-* web search to retrieve additional context
 * ...and much more
