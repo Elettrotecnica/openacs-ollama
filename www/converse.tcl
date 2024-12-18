@@ -151,7 +151,7 @@ if {$message ne ""} {
                     try {
                         const r = JSON.parse(text);
                         text = '';
-                        reply.textContent+= r.message.content;
+                        reply.innerHTML += converter.makeHtml(r.message.content);
                         if (r.done) {
                             break;
                         }
