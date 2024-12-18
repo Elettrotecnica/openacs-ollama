@@ -56,7 +56,7 @@ if {$conversation_id eq ""} {
     -src /resources/acs-templating/modal.js
 
 ::template::head::add_javascript \
-    -src https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js
+    -src urn:ad:js:ollama-showdown
 
 ::template::add_body_handler -event load -script {
     const converter = new showdown.Converter();
