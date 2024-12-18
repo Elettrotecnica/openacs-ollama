@@ -4,7 +4,7 @@
   <h1>Knowledge Base</h1>
   <ul>
     <multiple name="knowledge">
-      <li><a href="@knowledge.url@">@knowledge.instance_name@</a></li>
+      <li>@knowledge.instance_name@ - <a href="@knowledge.url@">@knowledge.url@</a></li>
     </multiple>
   </ul>
 
