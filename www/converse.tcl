@@ -6,6 +6,8 @@ ad_page_contract {
     {message ""}
     {conversation_id:naturalnum ""}
     model:optional
+    {use_index_p:boolean true}
+    {use_websearch_p:boolean false}
 }
 
 set user_id [ad_conn user_id]
@@ -65,6 +67,11 @@ if {$conversation_id eq ""} {
     }
 }
 
+set websearch_p [::parameter::get_global_value \
+                     -package_key ollama \
+                     -parameter websearch_p \
+                     -default false]
+
 if {$message ne ""} {
     #
     # Enhance the query with the context coming from our documents.
@@ -72,6 +79,8 @@ if {$message ne ""} {
     set rag [::ollama::rag::context \
                  -user_id $user_id \
                  -package_id $package_id \
+                 -with_index=$use_index_p \
+                 -with_websearch=[expr {$websearch_p && $use_websearch_p}] \
                  -query $message]
 
     set n_messages [db_string save_message {
@@ -227,21 +236,37 @@ foreach option [ollama models] {
         [list $option $option]
 }
 
+set form {
+    {message:text(textarea)
+        {label {Message}}
+    }
+    {model:text(select)
+        {label {Model}}
+        {options $models}
+        {value $selected_model}
+    }
+    {use_index_p:text(select)
+        {label {Search in the knowledge base?}}
+        {options {{Yes true} {No false}}}
+        {value true}
+    }
+}
+
+if {$websearch_p} {
+    append form {
+        {use_websearch_p:text(select)
+            {label {Search the web?}}
+            {options {{Yes true} {No false}}}
+            {value false}
+        }
+    }
+}
+
 ad_form \
     -name chat \
     -export {conversation_id} \
-    -form {
-        {message:text(textarea)
-            {label {Message}}
-        }
-        {model:text(select)
-            {label {Model}}
-            {options $models}
-            {value $selected_model}
-        }
-    } -on_request {
-
-    } -on_submit {
-    }
+    -form $form\
+    -on_request {} \
+    -on_submit {}
 
 

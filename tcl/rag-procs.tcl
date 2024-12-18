@@ -7,12 +7,10 @@ ad_library {
 namespace eval ollama {}
 namespace eval ollama::rag {}
 
-ad_proc -private ollama::rag::references {
+ad_proc -private ollama::rag::index_references {
     {-package_id ""}
     -query:required
     {-user_id ""}
-    {-top_k ""}
-    {-similarity_threshold ""}
 } {
     Query the index and find references to be used for RAG.
 
@@ -28,18 +26,14 @@ ad_proc -private ollama::rag::references {
     set embedding_size [llength $embedding]
     set embedding \[[join $embedding ,]\]
 
-    if {$similarity_threshold eq ""} {
-        set similarity_threshold [::parameter::get_global_value \
-                                      -package_key ollama \
-                                      -parameter similarity_threshold \
-                                      -default 0.9]
-    }
-    if {$top_k eq ""} {
-        set top_k [::parameter::get_global_value \
-                       -package_key ollama \
-                       -parameter rag_top_k \
-                       -default 5]
-    }
+    set similarity_threshold [::parameter::get_global_value \
+                                  -package_key ollama \
+                                  -parameter similarity_threshold \
+                                  -default 0.9]
+    set top_k [::parameter::get_global_value \
+                   -package_key ollama \
+                   -parameter rag_top_k \
+                   -default 5]
 
     if {$user_id eq ""} {
         set user_id [acs_magic_object the_public]
@@ -89,13 +83,79 @@ ad_proc -private ollama::rag::references {
     return $references
 }
 
+ad_proc -private ::ollama::rag::fetch_pages {
+    -urls:required
+} {
+    Fetches the content from a list of URLs via GET request. Does not
+    follow links.
+
+    @return a list of contents in respective order with the supplied
+            URLs
+} {
+    return [lmap url $urls {
+        set r [::util::http::get -url $url]
+        ns_striphtml [expr {[dict get $r status] == 200 ? [dict get $r page] : ""}]
+    }]
+}
+
+ad_proc -private ollama::rag::websearch_references {
+    -query:required
+} {
+    Query the web and find references to be used for RAG.
+
+    @return list of references in dict format
+} {
+    set top_k [::parameter::get_global_value \
+                   -package_key ollama \
+                   -parameter rag_top_k \
+                   -default 5]
+
+    #
+    # We use the query as-is. It may be that we will need a
+    # translation step, e.g. an LLM transforming the arbitrary text
+    # into a search query.
+    #
+    ns_log notice \
+        ollama::rag::websearch_references \
+        "Searching the web"
+
+    set urls [lrange [::ollama::search_engine::duckduckgo::search -query $query] 0 ${top_k}-1]
+
+    ns_log notice \
+        ollama::rag::websearch_references \
+        "Fetching results"
+
+    set pages [::ollama::rag::fetch_pages -urls $urls]
+
+    set references [list]
+    foreach page $pages url $urls {
+        #
+        # In the UI we expect index and object id to be there, so we
+        # generate one.
+        #
+        set reference_id [ns_uuid]
+        lappend references [list \
+                                index_id $reference_id \
+                                object_id $reference_id \
+                                content $page \
+                                similarity _ \
+                                url $url \
+                                title $url]
+    }
+
+    ns_log notice \
+        ollama::rag::websearch_references \
+        "We found [llength $references] references."
+
+    return $references
+}
+
 ad_proc -private ollama::rag::context {
     {-package_id ""}
     -query:required
     {-user_id ""}
-    {-top_k ""}
-    {-similarity_threshold ""}
-    {-template ""}
+    -with_index:boolean
+    -with_websearch:boolean
 } {
     Builds the RAG context by fetching references relevant
     to the query and user supplied.
@@ -110,23 +170,36 @@ ad_proc -private ollama::rag::context {
         set package_id [ad_conn package_id]
     }
 
-    if {$template eq ""} {
+    set references [list]
+    if {$with_index_p} {
+        lappend references {*}[::ollama::rag::index_references \
+                                   -package_id $package_id \
+                                   -query $query \
+                                   -user_id $user_id]
+    }
+    if {$with_websearch_p} {
+        lappend references {*}[::ollama::rag::websearch_references \
+                                   -query $query]
+    }
+
+    if {[llength $references] == 0} {
+        #
+        # Nothing found, message stays the same.
+        #
+        set context $query
+    } else {
+        #
+        # Found something, enhance the query with the extra knowledge.
+        #
         set template [::parameter::get_global_value \
                           -package_key ollama \
                           -parameter rag_context_template]
+
+        set context [join [lmap ref $references {
+            dict get $ref content
+        }] \n\n]
+        set context [subst -nocommands $template]
     }
-
-    set references [ollama::rag::references \
-                        -package_id $package_id \
-                        -query $query \
-                        -user_id $user_id \
-                        -top_k $top_k \
-                        -similarity_threshold $similarity_threshold]
-
-    set context [join [lmap ref $references {
-        dict get $ref content
-    }] \n\n]
-    set context [subst -nocommands $template]
 
     #
     # It seems, we need this in order for ollama to accept our
@@ -137,6 +210,64 @@ ad_proc -private ollama::rag::context {
     return [list \
                 context $context \
                 references $references]
+}
+
+namespace eval ::ollama::search_engine {}
+namespace eval ::ollama::search_engine::duckduckgo {}
+
+ad_proc -private ::ollama::search_engine::duckduckgo::search {
+    -query:required
+} {
+    Performs a search on DuckDuckGo.
+
+    @see https://duckduckgo.com/
+
+    @return a list of URLs
+} {
+    set url [export_vars -base https://duckduckgo.com/ {{q $query}}]
+    set r [::util::http::get -url $url]
+
+    if {[dict get $r status] != 200} {
+        set msg "Error when retrieving the homepage: [dict get $r status]"
+        ns_log error $msg $r
+        error $msg
+    }
+
+    if {![regexp \
+              "href=\"(https://links.duckduckgo.com/d\.js\[^\"\]*)\"" \
+              [dict get $r page] \
+              _ \
+              links_url]} {
+        set msg "Cannot find URLs link..."
+        ns_log error $msg [dict get $r page]
+        error $msg
+    }
+
+    set r [::util::http::get -url $links_url]
+
+    if {[dict get $r status] != 200} {
+        set msg "Error when retrieving the links URL: [dict get $r status]"
+        ns_log error $msg $r
+        error $msg
+    }
+
+    set links [dict get $r page]
+    set links [string range \
+                   $links \
+                   [string first "resultLanguages', " $links] \
+                   end
+                  ]
+    set links [string range \
+                   $links \
+                   [string first "\[" $links]+1 \
+                   [string first "\]" $links]-1 \
+                  ]
+
+    set links [lmap l [split $links ,] {
+        string range $l 1 end-1
+    }]
+
+    return $links
 }
 
 #

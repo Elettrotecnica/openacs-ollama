@@ -9,16 +9,16 @@
     <implements-subsite-p>f</implements-subsite-p>
     <inherit-templates-p>f</inherit-templates-p>
 
-    <version name="0.8d" url="http://openacs.org/repository/download/apm/ollama-0.8d.apm">
+    <version name="0.9d" url="http://openacs.org/repository/download/apm/ollama-0.9d.apm">
         <owner url="mailto:antonio@elettrotecnica.it">Antonio Pisano</owner>
         <summary>Ollama LLM Tool integration</summary>
-        <release-date>2024-12-10</release-date>
+        <release-date>2024-12-18</release-date>
         <vendor url="https://www.elettrotecnica.it">L&#39;Elettrotecnica S.r.l.</vendor>
         <description format="text/html">This package provides an integration to the Ollama LLM tool (https://github.com/ollama/ollama).</description>
         <maturity>0</maturity>
 
-        <provides url="ollama" version="0.8d"/>
-        <requires url="search" version="6.0.0d3"/>
+        <provides url="ollama" version="0.9d"/>
+        <requires url="search" version="6.0.0d1"/>
 
         <callbacks>
             <callback type="after-install"  proc="ollama::install::package_install"/>
@@ -45,6 +45,7 @@ Given the context information, address the query.
 Query: $query" description="Template that will be added to the chat prompt in order to instruct the LLM to use additional context when providing a reply. It can contain the variables &#34;context&#34; (the actual extra content) and &#34;query&#34; (the question to the model), which will be substituted." section_name="RAG"/>
             <parameter scope="global" datatype="number"  min_n_values="1"  max_n_values="1"  name="rag_top_k"  default="5" description="Max number of entries, sorted by decreasing relevance, to retrieve when fetching context for Retrieval Augmented Generation." section_name="RAG"/>
             <parameter scope="global" datatype="number"  min_n_values="1"  max_n_values="1"  name="similarity_threshold"  default="0.9" description="Minimal similarity threshold used to decide if a document is relevant. This value expresses a cosine similarity in the 0 (highest) to 2 (smallest) range." section_name="Search"/>
+            <parameter scope="global" datatype="number"  min_n_values="1"  max_n_values="1"  name="websearch_p"  default="0" description="Allow to search the web when querying the model?" section_name="RAG"/>
         </parameters>
 
     </version>
