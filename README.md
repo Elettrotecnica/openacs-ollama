@@ -34,3 +34,12 @@ Retrieval Augmented Generation is a popular technique used to inject on-the-fly 
 The way RAG is implemented in this package is the following: regardless of whether you are using the ollama-driver for full-text-search, searchable packages such as file-storage, xowiki, forums and so on that are mounted underneath an ollama instance will be indexed. They will be treated as a "knowledge base" for their parent package.
 
 We then implemented a "chat-like" UI where questions to the selected model will be enhanced by our knowledge whenever relevant information is found.
+
+As many models will output markdown when replying to the user, we have also integrated on-the-fly markdown-to-html conversion via the [Showdown](https://showdownjs.com/) library.
+
+## Possible TODOs
+
+* images in RAG conversations
+* support for index bootsrap/reindexing in the UI
+* web search to retrieve additional context
+* ...and much more
