@@ -11,6 +11,8 @@ ad_page_contract {
 set user_id [ad_conn user_id]
 set package_id [ad_conn package_id]
 set peeraddr [ad_conn peeraddr]
+set index_notif_pretty_name [_ ollama.index_notification_pretty_name]
+set url [ad_conn url]
 
 ::permission::require_permission \
     -party_id $user_id \

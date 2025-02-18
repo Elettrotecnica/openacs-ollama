@@ -149,6 +149,11 @@ ad_proc -public ollama::index {
                            -parameter indexing_chunk_overlap \
                            -default 100]
 
+    set package_id [db_string get_package {
+        select package_id from acs_objects
+        where object_id = :object_id
+    }]
+
     db_transaction {
         db_dml clear_entries {
             delete from ollama_ts_index
@@ -167,6 +172,12 @@ ad_proc -public ollama::index {
                 values
                 (:object_id, :chunk)
             }
+
+            #
+            # Take note that this package is being indexed.
+            #
+            nsv_incr ollama_indexed_packages $package_id
+
             incr count
         }
     }
@@ -191,13 +202,16 @@ ad_proc -private ollama::batch_index {} {
         try {
             set indexes [list]
             set input [list]
+            set packages [list]
             db_foreach get_unindexed_entries {
-                select index_id, content
-                from ollama_ts_index
-                where embedding is null
+                select i.index_id, i.content, o.package_id
+                from ollama_ts_index i, acs_objects o
+                where o.object_id = i.object_id
+                  and embedding is null
                 fetch first :batch_size rows only
             } {
                 lappend indexes $index_id
+                lappend packages $package_id
                 #
                 # Ollama will reject requests containing what it deems
                 # invalid UTF-8...
@@ -218,7 +232,7 @@ ad_proc -private ollama::batch_index {} {
                                          [dict get $response body] \
                                         ] embeddings]
 
-                foreach index_id $indexes embedding $embeddings {
+                foreach index_id $indexes embedding $embeddings package_id $packages {
                     if {$embedding eq ""} {
                         db_dml delete_not_indexable {
                             delete from ollama_ts_index
@@ -237,6 +251,18 @@ ad_proc -private ollama::batch_index {} {
                         ns_log notice \
                             ollama::batch_index \
                             stored embedding for index_id=$index_id
+                    }
+
+                    if {[nsv_incr ollama_indexed_packages $package_id -1] == 0} {
+                        #
+                        # This was the last entry to be indexed for
+                        # this package. Notify subscribers that
+                        # indexing is over.
+                        #
+                        ::ollama::notification::index_notification \
+                            -package_id $package_id
+
+                        ns_log warning NOTIFY!!
                     }
                 }
             } else {
