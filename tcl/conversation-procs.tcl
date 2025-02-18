@@ -62,7 +62,8 @@ ad_proc -private ollama::conversation::generate_title {
             Generate a suitable title for the message enclosed within
             <message></message> XML tags. Generate the title and
             nothing else. Ensure the title is in the same language as
-            the message.
+            the message. Keep the title short! Should not be longer
+            than a single sentence.
 
             <message>$content</content>
         }]]
@@ -82,6 +83,10 @@ ad_proc -private ollama::conversation::generate_title {
                                  [::json::json2dict \
                                       [dict get $response body] \
                                      ] message] content]
+        #
+        # Don't hit the 1000 acs_objects.title character limit.
+        #
+        set title [string range $title 0 1000]
 
         ns_log notice \
             ollama::conversation::generate_title \
