@@ -38,6 +38,8 @@ ad_proc -private ollama::conversation::save_reply {
     }
 }
 
+
+
 ad_proc -private ollama::conversation::generate_title {
     -conversation_id:required
 } {
@@ -84,9 +86,15 @@ ad_proc -private ollama::conversation::generate_title {
                                       [dict get $response body] \
                                      ] message] content]
         #
+        # Hack: DeepSeek will always output its Chain of Thought
+        # before a reply. We do not want that.
+        #
+        regsub {^\s*<think>.*</think>\s*} $title {} title
+
+        #
         # Don't hit the 1000 acs_objects.title character limit.
         #
-        set title [string range $title 0 1000]
+        set title [string range $title 0 999]
 
         ns_log notice \
             ollama::conversation::generate_title \
