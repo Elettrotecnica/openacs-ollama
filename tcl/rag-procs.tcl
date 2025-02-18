@@ -93,8 +93,17 @@ ad_proc -private ::ollama::rag::fetch_pages {
             URLs
 } {
     return [lmap url $urls {
-        set r [::util::http::get -url $url]
-        ns_striphtml [expr {[dict get $r status] == 200 ? [dict get $r page] : ""}]
+        set r [::util::http::get -spool -url $url]
+        if {[dict get $r status] != 200} {
+            continue
+        }
+
+        set mime_type [string trim [lindex [split [dict get $r headers content-type] ";"] 0]]
+        set text [::search::convert::binary_to_text \
+                      -filename [dict get $r file] \
+                      -mime_type $mime_type]
+        ns_log warning $url $mime_type $text
+        set text
     }]
 }
 
