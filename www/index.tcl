@@ -6,6 +6,7 @@ ad_page_contract {
     {message ""}
     {conversation_id:naturalnum ""}
     model:optional
+    {page:naturalnum 1}
 }
 
 set user_id [ad_conn user_id]
