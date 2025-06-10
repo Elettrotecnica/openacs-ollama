@@ -29,8 +29,6 @@ ad_proc -private ollama::conversation::save_reply {
         return
     }
 
-    set content [encoding convertfrom $content]
-
     db_dml save_token {
         update ollama_conversation_messages set
         content = coalesce(content, '') || :content

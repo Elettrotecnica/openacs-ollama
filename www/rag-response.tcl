@@ -90,7 +90,7 @@ ad_schedule_proc -thread t -once t 0 ::apply {
                     ollama::conversation::save_reply \
                         -message_id $message_id \
                         -token $data
-                    ns_connchan write $channel $data
+                    ns_connchan write $channel [encoding convertto $data]
                 }
             }
         }} $channel $message_id]
