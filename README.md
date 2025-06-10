@@ -11,6 +11,7 @@ This package provides integration with [Ollama](https://ollama.com/) in OpenACS.
 
 ## Dependencies
 
+* NaviServer >= 5.0 with [ns_http -response_data_callback feature](https://naviserver.sourceforge.io/5.0/naviserver/files/ns_http.html)
 * Postgres databse
 * [PgVector](https://github.com/pgvector/pgvector) extension must be available.
 * An Ollama instance accessible by the OpenACS installation.
