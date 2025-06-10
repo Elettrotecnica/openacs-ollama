@@ -37,6 +37,7 @@ set actions [list \
     -multirow conversations \
     -key conversation_id \
     -actions $actions \
+    -page_flush_p true \
     -page_size 30 \
     -page_groupsize 10 \
     -page_query {
