@@ -67,7 +67,7 @@ ad_proc -private ollama::conversation::generate_title {
             the message. Keep the title short! Should not be longer
             than a single sentence.
 
-            <message>$content</content>
+            <message>$content</message>
         }]]
 
         set response [titler chat \
