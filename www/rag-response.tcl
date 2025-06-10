@@ -67,21 +67,32 @@ ad_schedule_proc -thread t -once t 0 ::apply {
             lappend messages $message
         }
 
-        set handler [list ::apply {{channel message_id socket token} {
-            set data [read $socket]
-            if {[dict get [ns_connchan status $channel] sent] == 0} {
-                ns_log warning "Start reply"
-                set headers [join [lmap {key value} [::http::meta $token] {
-                    string cat "${key}:" " ${value}"
-                }] \r\n]
-                set headers "[::http::code $token]\r\n${headers}\r\n\r\n"
-                ns_log warning headers $headers
-                ns_connchan write -buffered $channel $headers
+        set handler [list ::apply {{channel message_id d} {
+            dict with d {
+                if {[info exists status]} {
+                    ns_log warning "Start reply"
+                    #
+                    # Headers have been received.
+                    #
+                    set response "HTTP/1.1 $status $phrase\r\n"
+                    foreach {key value} [ns_set array $headers] {
+                        append response "$key: $value\r\n"
+                    }
+                    append response \r\n
+                    ns_log warning headers $response
+                    ns_connchan write $channel $response
+                } else {
+                    #
+                    # Response is coming through. Save it and relay to
+                    # the client.
+                    #
+                    ns_log warning {Received data} $data
+                    ollama::conversation::save_reply \
+                        -message_id $message_id \
+                        -token $data
+                    ns_connchan write $channel $data
+                }
             }
-            ollama::conversation::save_reply \
-                -message_id $message_id \
-                -token $data
-            ns_connchan write -buffered $channel $data
         }} $channel $message_id]
 
 

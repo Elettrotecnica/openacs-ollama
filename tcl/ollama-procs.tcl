@@ -89,32 +89,34 @@ namespace eval ollama {
             set payload [::util::http::post_payload -files $files -body $body]
             set body [dict get $payload payload]
             set body_file [dict get $payload payload_file]
-            set headers [ns_set array [dict get $payload headers]]
+            set headers [dict get $payload headers]
 
-            package require http
-            package require tls
-            ::http::register https 443 ::tls::socket
-
-            set cmd [list \
-                         ::http::geturl ${:host}$url \
+            set cmd [list ns_http run \
+                         -method POST \
                          -headers $headers]
+
             if {$body_file ne ""} {
-                set body_channel [open $body_file r]
-                lappend cmd -querychannel $body_channel
+                lappend cmd -body_file $body_file
             } else {
-                lappend cmd -query $body
-            }
-            if {$handler ne ""} {
-                lappend cmd -handler $handler
+                lappend cmd -body $body
             }
 
-            try {
-                set response [array get [{*}$cmd]]
-            } finally {
-                if {[info exists body_channel]} {
-                    close $body_channel
-                }
+            if {$handler ne ""} {
+                #
+                # ns_http uses 2 separate handlers for headers and
+                # data, but this api only uses 1. They will be
+                # differentiated by their dict information.
+                #
+                lappend cmd \
+                    -response_header_callback $handler \
+                    -response_data_callback $handler
             }
+
+            lappend cmd ${:host}$url
+
+            # ns_log warning Sending |$cmd|
+
+            set response [{*}$cmd]
 
             return $response
         }
