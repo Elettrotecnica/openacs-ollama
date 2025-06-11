@@ -81,14 +81,13 @@ db_multirow -extend {
 } conversations get_conversations [subst {
     select c.conversation_id,
            o.title,
-           count(*) as n_messages,
+           count(m.conversation_id) as n_messages,
            max(m.timestamp) as last_message,
            min(m.timestamp) as first_message
-      from ollama_conversations c,
-           acs_objects o,
-           ollama_conversation_messages m
+      from ollama_conversations c
+           left join ollama_conversation_messages m on m.conversation_id = c.conversation_id,
+           acs_objects o
     where o.object_id = c.conversation_id
-      and m.conversation_id = c.conversation_id
       and [::template::list::page_where_clause -name conversations -key c.conversation_id]
      group by c.conversation_id, o.object_id
     order by first_message asc, title asc
