@@ -9,7 +9,7 @@
     <implements-subsite-p>f</implements-subsite-p>
     <inherit-templates-p>f</inherit-templates-p>
 
-    <version name="1.0.1" url="http://openacs.org/repository/download/apm/ollama-1.0.1.apm">
+    <version name="1.0.2" url="http://openacs.org/repository/download/apm/ollama-1.0.2.apm">
         <owner url="mailto:antonio@elettrotecnica.it">Antonio Pisano</owner>
         <summary>Ollama LLM Tool integration</summary>
         <release-date>2024-12-18</release-date>
@@ -17,7 +17,7 @@
         <description format="text/html">This package provides an integration to the Ollama LLM tool (https://github.com/ollama/ollama).</description>
         <maturity>0</maturity>
 
-        <provides url="ollama" version="1.0.1"/>
+        <provides url="ollama" version="1.0.2"/>
         <requires url="search" version="6.0.0d1"/>
         <requires url="notifications" version="6.0.0d2"/>
 

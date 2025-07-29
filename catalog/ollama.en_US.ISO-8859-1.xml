@@ -3,4 +3,5 @@
 
   <msg key="has_finsihed_indexing">has finished indexing documents uploaded into its knowledge base.</msg>
   <msg key="indexing_complete">Indexing completed</msg>
+  <msg key="index_notification_pretty_name">semantic indexing completion</msg>
 </message_catalog>
