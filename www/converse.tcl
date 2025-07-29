@@ -61,9 +61,28 @@ if {$conversation_id eq ""} {
     -src urn:ad:js:ollama-showdown
 
 ::template::add_body_handler -event load -script {
-    const converter = new showdown.Converter();
+    /*
+       Convert markdown returned by most LLMs into HTML and apply
+       special formatting to the thinking output. This will marked
+       separately from the actual response and collapsed at the end of
+       the reply.
+    */
+    window.convertMarkdown = (function () {
+        const thinkingEndedRegexp = new RegExp(/<think>((.|\n|\r)*)<\/think>/m);
+        const thinkingRegexp = new RegExp(/<think>((.|\n|\r)*)/m);
+        const converter = new showdown.Converter();
+        return function (text, collapse = false) {
+            if (text.match(thinkingEndedRegexp)) {
+                const replacement = collapse ? '<details><summary>Thinking</summary>$1<hr></details>' : '###### Thinking\n$1<hr>';
+                text = text.replace(thinkingEndedRegexp, replacement);
+            } else {
+                text = text.replace(thinkingRegexp, '###### Thinking...\n$1');
+            }
+            return converter.makeHtml(text);
+        }
+    })();
     for (const message of document.querySelectorAll('.markdown')) {
-       message.innerHTML = converter.makeHtml(message.textContent);
+       message.innerHTML = convertMarkdown(message.textContent, true);
     }
 }
 
@@ -139,8 +158,6 @@ if {$message ne ""} {
 
                 const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
-                const converter = new showdown.Converter();
-
                 let text = '';
                 while (true) {
                     const {value, done} = await reader.read();
@@ -152,7 +169,7 @@ if {$message ne ""} {
                         const r = JSON.parse(text);
                         text = '';
                         reply.dataset.text += r.message.content;
-                        reply.innerHTML = converter.makeHtml(reply.dataset.text);
+                        reply.innerHTML = convertMarkdown(reply.dataset.text);
                         if (r.done) {
                             break;
                         }
@@ -161,6 +178,9 @@ if {$message ne ""} {
                         console.log('PARTIAL READ');
                     }
                 }
+
+                // Finally, collapse the thinking.
+                reply.innerHTML = convertMarkdown(reply.dataset.text, true);
 
                 reader.cancel();
 
