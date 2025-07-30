@@ -207,6 +207,7 @@ ad_proc -private ollama::batch_index {} {
                 select i.index_id, i.content, o.package_id
                 from ollama_ts_index i, acs_objects o
                 where o.object_id = i.object_id
+                  and o.package_id is not null
                   and embedding is null
                 fetch first :batch_size rows only
             } {
